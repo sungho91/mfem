@@ -51,6 +51,7 @@ int main(int argc, char *argv[])
    int order = 1;
    bool static_cond = false;
    bool visualization = 1;
+   bool paraview = false; // To enalbe paraview output
 
    OptionsParser args(argc, argv);
    args.AddOption(&mesh_file, "-m", "--mesh",
@@ -62,6 +63,9 @@ int main(int argc, char *argv[])
    args.AddOption(&visualization, "-vis", "--visualization", "-no-vis",
                   "--no-visualization",
                   "Enable or disable GLVis visualization.");
+   args.AddOption(&paraview, "-paraview", "--paraview-datafiles", "-no-paraview",
+                  "--no-paraview-datafiles",
+                  "Save data files for ParaView (paraview.org) visualization."); // To enalbe paraview output
    args.Parse();
    if (!args.Good())
    {
@@ -117,20 +121,20 @@ int main(int argc, char *argv[])
    }
    else
    {
-      fec = new H1_FECollection(order, dim);
-      fespace = new FiniteElementSpace(mesh, fec, dim);
+      fec = new H1_FECollection(order, dim); //  finite element basis functions
+      fespace = new FiniteElementSpace(mesh, fec, dim); // FiniteElementSpace, which connects the space and the mesh.
    }
    cout << "Number of finite element unknowns: " << fespace->GetTrueVSize()
-        << endl << "Assembling: " << flush;
+        << endl << "Assembling: " << flush; // get seize from fespace.
 
    // 6. Determine the list of true (i.e. conforming) essential boundary dofs.
    //    In this example, the boundary conditions are defined by marking only
    //    boundary attribute 1 from the mesh as essential and converting it to a
    //    list of true dofs.
    Array<int> ess_tdof_list, ess_bdr(mesh->bdr_attributes.Max());
-   ess_bdr = 0;
-   ess_bdr[0] = 1;
-   fespace->GetEssentialTrueDofs(ess_bdr, ess_tdof_list);
+   ess_bdr = 0; // initializing???
+   ess_bdr[0] = 1; // fixing boundary condition on left side
+   fespace->GetEssentialTrueDofs(ess_bdr, ess_tdof_list); //imposing boundary condition
 
    // 7. Set up the linear form b(.) which corresponds to the right-hand side of
    //    the FEM linear system. In this case, b_i equals the boundary integral
@@ -141,15 +145,20 @@ int main(int argc, char *argv[])
    //    on boundary attribute 2 is indicated by the use of piece-wise constants
    //    coefficient for its last component.
    VectorArrayCoefficient f(dim);
+   // cout << "f vec size = "<< mesh->bdr_attributes.Max() << endl;
    for (int i = 0; i < dim-1; i++)
    {
       f.Set(i, new ConstantCoefficient(0.0));
    }
    {
-      Vector pull_force(mesh->bdr_attributes.Max());
-      pull_force = 0.0;
-      pull_force(1) = -1.0e-2;
-      f.Set(dim-1, new PWConstCoefficient(pull_force));
+      Vector pull_force(mesh->bdr_attributes.Max()); // extracting boundary node points
+      pull_force = 0.0; // initializing pull_foce
+      pull_force(1) = -1.0e-2; // impoising force... where?
+      // for (int kkk=0; kkk < 40; kkk++)
+      // {
+      //    cout << kkk <<"/"<<pull_force(kkk) << endl;
+      // }
+      f.Set(dim-1, new PWConstCoefficient(pull_force)); 
    }
 
    LinearForm *b = new LinearForm(fespace);
@@ -234,6 +243,22 @@ int main(int argc, char *argv[])
       ofstream sol_ofs("sol.gf");
       sol_ofs.precision(8);
       x.Save(sol_ofs);
+   }
+
+   ParaViewDataCollection *pd = NULL;
+   if (paraview)
+   {
+      cin.get();
+      pd = new ParaViewDataCollection("Example02", mesh);
+      pd->SetPrefixPath("ParaView");
+      pd->RegisterField("displacement", &x);
+      pd->SetLevelsOfDetail(order);
+      // pd->SetDataFormat(VTKFormat::ASCII);
+      pd->SetDataFormat(VTKFormat::BINARY);
+      pd->SetHighOrderOutput(true);
+      pd->SetCycle(0);
+      pd->SetTime(0.0);
+      pd->Save();
    }
 
    // 15. Send the above data by socket to a GLVis server. Use the "n" and "b"

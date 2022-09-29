@@ -39,6 +39,7 @@
 #include <memory>
 #include <iostream>
 #include <fstream>
+#include <cstdlib> 
 
 using namespace std;
 using namespace mfem;
@@ -167,6 +168,7 @@ int main(int argc, char *argv[])
    double mu = 0.25;
    double K = 5.0;
    bool visualization = true;
+   bool paraview = false; // To enalbe paraview output
    int vis_steps = 1;
 
    OptionsParser args(argc, argv);
@@ -195,6 +197,9 @@ int main(int argc, char *argv[])
    args.AddOption(&visualization, "-vis", "--visualization", "-no-vis",
                   "--no-visualization",
                   "Enable or disable GLVis visualization.");
+   args.AddOption(&paraview, "-paraview", "--paraview-datafiles", "-no-paraview",
+                  "--no-paraview-datafiles",
+                  "Save data files for ParaView (paraview.org) visualization."); // To enalbe paraview output 
    args.AddOption(&vis_steps, "-vs", "--visualization-steps",
                   "Visualize every n-th timestep.");
    args.Parse();
@@ -319,6 +324,23 @@ int main(int argc, char *argv[])
    oper.SetTime(t);
    ode_solver->Init(oper);
 
+   ParaViewDataCollection *pd = NULL;
+   if (paraview)
+   {
+      cin.get();
+      pd = new ParaViewDataCollection("Example10", mesh);
+      pd->SetPrefixPath("ParaView");
+      pd->RegisterField("displacement", &x);
+      pd->RegisterField("velocity", &w);
+      pd->SetLevelsOfDetail(order);
+      // pd->SetDataFormat(VTKFormat::ASCII);
+      pd->SetDataFormat(VTKFormat::BINARY);
+      pd->SetHighOrderOutput(true);
+      pd->SetCycle(0);
+      pd->SetTime(0.0);
+      pd->Save();
+   }
+
    // 8. Perform time-integration (looping over the time iterations, ti, with a
    //    time-step dt).
    bool last_step = false;
@@ -347,6 +369,16 @@ int main(int argc, char *argv[])
                oper.GetElasticEnergyDensity(x, w);
                visualize(vis_w, mesh, &x, &w);
             }
+         }
+
+         if (paraview)
+         {  
+            // GridFunction *nodes = &x;
+            // int owns_nodes = 0;
+            // mesh->SwapNodes(nodes, owns_nodes);
+            pd->SetCycle(ti);
+            pd->SetTime(t);
+            pd->Save();
          }
       }
    }

@@ -1085,6 +1085,7 @@ void ParaViewDataCollection::SaveGFieldVTU(std::ostream &os, int ref_,
    else
    {
       // vector data
+      // std::cout << "vec_dim = " << vec_dim << std::endl;
       for (int i = 0; i < mesh->GetNE(); i++)
       {
          RefG = GlobGeometryRefiner.Refine(
